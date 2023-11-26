@@ -1,4 +1,4 @@
-# testrepo
+# GigaTron
 
 ## Editing the file
 
