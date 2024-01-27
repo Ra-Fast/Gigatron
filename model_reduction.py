@@ -9,13 +9,17 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, roc_curve, confusion_matrix,auc
 from sklearn.model_selection import train_test_split
+from scipy.stats import entropy
+from scipy.stats import mutual_info_score
 
 class ModelGenerator:
-    def __init__(self, num_dimensions, num_classes, num_samples=1000, random_state=42):
+    def __init__(self, num_dimensions, num_classes, bins=10, drop_fraction=10,num_samples=1000, random_state=42):
         self.num_dimensions = num_dimensions
         self.num_classes = num_classes
         self.num_samples = num_samples
         self.random_state = random_state
+        self.bins=bins
+        self.drop_fraction=drop_fraction
         self.df = None  # Internal variable to store the DataFrame
         self.model = None  # Internal variable to store the TensorFlow model
         self.history = None  # Internal variable to store training history
@@ -24,6 +28,8 @@ class ModelGenerator:
         self.y_test_binary = None  # Internal variable to store binary ground truth labels
         self.X = None  # Internal variable to store feature matrix
         self.y = None  # Internal variable to store target vector
+        self.X_init = None  # Internal variable to store feature matrix - Initial values
+        self.y_init = None  # Internal variable to store target vector - Initial values
 
         tf.random.set_seed(random_state)
         np.random.seed(random_state)
@@ -53,15 +59,18 @@ class ModelGenerator:
         self.X = X_scaled
         self.y = y
 
+        # Store initial values
+        self.X_init=self.X
+        self.y_init=self.y
         # Display scatter plot if plot_scatter is True
         if plot_scatter:
             self.plot_scatter()
 
-        return self.X, self.y
+        return self.X, self.y, self.X_init, self.y_init
 
-    def drop_rows_randomly(self, drop_fraction):
+    def drop_rows_randomly(self):
         if self.X is not None and self.y is not None:
-            num_rows_to_drop = int(self.X.shape[0] * drop_fraction)
+            num_rows_to_drop = int(self.X.shape[0] * self.drop_fraction)
             indices_to_drop = np.random.choice(self.X.shape[0], num_rows_to_drop, replace=False)
 
             self.X = np.delete(self.X, indices_to_drop, axis=0)
@@ -71,6 +80,28 @@ class ModelGenerator:
 
         else:
             print("Feature matrix (X) or target vector (y) not available. Call generate_synthetic_data first.")
+
+    def calculate_entropy(self, bins):
+        entropy_values = []
+        for column in self.X.columns:
+            hist, bin_edges = np.histogram(self.X[column], bins=bins, range=(0, 1), density=True)
+            entropy_values.append(entropy(hist, base=2))
+        return entropy_values
+        
+    def calculate_mutual_information(self):
+        mutual_info_values = []
+        for i in range(len(self.X.columns)):
+            for j in range(i + 1, len(self.X.columns)):
+                mi = mutual_info_score(self.X.iloc[:, i], self.X.iloc[:, j], bins=self.bins)
+                mutual_info_values.append(mi)
+        return mutual_info_values
+    
+    def calculate_relative_entropy(self):
+        relative_entropy_values = []
+        for i in range(len(self.X_init.columns)):
+            kl_distance = entropy(self.X_init.iloc[:, i], qk=self.X.iloc[:, i], base=2)
+            relative_entropy_values.append(kl_distance)
+        return relative_entropy_values
 
     def plot_histogram(self, num_bins=10):
         if self.df is not None:
