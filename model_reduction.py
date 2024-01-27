@@ -10,16 +10,16 @@ from tensorflow.keras.layers import Dense
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, roc_curve, confusion_matrix,auc
 from sklearn.model_selection import train_test_split
 from scipy.stats import entropy
-from scipy.stats import mutual_info_score
+from sklearn.feature_selection import mutual_info_regression
 
 class ModelGenerator:
-    def __init__(self, num_dimensions, num_classes, bins=10, drop_fraction=10,num_samples=1000, random_state=42):
+    def __init__(self, num_dimensions, num_classes, bins=10,num_samples=1000, random_state=42):
         self.num_dimensions = num_dimensions
         self.num_classes = num_classes
         self.num_samples = num_samples
         self.random_state = random_state
         self.bins=bins
-        self.drop_fraction=drop_fraction
+        #self.drop_fraction=drop_fraction
         self.df = None  # Internal variable to store the DataFrame
         self.model = None  # Internal variable to store the TensorFlow model
         self.history = None  # Internal variable to store training history
@@ -65,12 +65,13 @@ class ModelGenerator:
         # Display scatter plot if plot_scatter is True
         if plot_scatter:
             self.plot_scatter()
+            #plt.scatter(self.X[:,0],self.X[:,1], c=self.y)
 
-        return self.X, self.y, self.X_init, self.y_init
+        return self.X, self.y
 
-    def drop_rows_randomly(self):
+    def drop_rows_randomly(self,drop_fraction):
         if self.X is not None and self.y is not None:
-            num_rows_to_drop = int(self.X.shape[0] * self.drop_fraction)
+            num_rows_to_drop = int(self.X.shape[0] * drop_fraction)
             indices_to_drop = np.random.choice(self.X.shape[0], num_rows_to_drop, replace=False)
 
             self.X = np.delete(self.X, indices_to_drop, axis=0)
@@ -92,8 +93,8 @@ class ModelGenerator:
         mutual_info_values = []
         for i in range(len(self.X.columns)):
             for j in range(i + 1, len(self.X.columns)):
-                mi = mutual_info_score(self.X.iloc[:, i], self.X.iloc[:, j], bins=self.bins)
-                mutual_info_values.append(mi)
+                    mi = mutual_info_regression(self.X.iloc[:, i:i+1], self.X.iloc[:, j])
+                    mutual_info_values.append(mi)
         return mutual_info_values
     
     def calculate_relative_entropy(self):
@@ -263,6 +264,7 @@ class ModelGenerator:
             plt.show()
         else:
             print("Training history not available. Call train_neural_network first.")
+
 '''
 # Example usage
 num_dimensions = 5        # Change this to your desired number of dimensions
@@ -278,7 +280,7 @@ X, y = model_instance.generate_synthetic_data(plot_scatter=True)
 model_instance.drop_rows_randomly(drop_fraction)
 model_instance.plot_histogram(num_bins=20)
 model_instance.build_neural_network(num_layers, num_neurons_per_layer)
-X_train, X_test, y_train, y_pred = model_instance.train_neural_network(num_epochs, batch_size)
+X_train, X_test, y_train, y_test,y_pred,y_pred_binary = model_instance.train_neural_network(num_epochs, batch_size)
 
-# Now X_train, X_test, y_train, and y_pred are accessible for further analysis or evaluation.
 '''
+# Now X_train, X_test, y_train, and y_pred are accessible for further analysis or evaluation.
