@@ -99,13 +99,22 @@ class ModelGenerator:
     
     def calculate_relative_entropy(self):
         relative_entropy_values = []
+        epsilon=0.000001
         for i in range(self.X_init.shape[1]):
             # Calculate probs
             prob_1,_=np.histogram(self.X_init[:,i],bins=self.bins,range=(0, 1), density=True)
             prob_2,_=np.histogram(self.X[:,i],bins=self.bins,range=(0, 1), density=True)
 
 
-            kl_distance = entropy(prob_1, prob_2, base=2)
+            #kl_distance = entropy(prob_1, prob_2, base=2)
+            # Check for null values of prob_2
+            for i in range(prob_2.shape[0]):
+                if prob_2[i]==0:
+                    prob_2[i]=epsilon
+
+            kl_distance=np.sum(prob_1*np.log2(prob_1/prob_2))
+
+
             relative_entropy_values.append(kl_distance)
         return relative_entropy_values
     
@@ -152,6 +161,7 @@ class ModelGenerator:
             print("DataFrame not generated or insufficient dimensions for scatter plot.")
 
     def build_neural_network(self, num_layers=2, num_neurons_per_layer=10):
+        model=None
         if self.df is not None:
             # Build a neural network using TensorFlow
             model = Sequential()
@@ -249,18 +259,18 @@ class ModelGenerator:
         self.y_pred_init = self.model.predict(self.X_init)
         self.y_pred_init_binary = (self.y_pred_init > 0.5) if self.num_classes == 2 else self.y_pred_init.argmax(axis=1)
         # Performance
-        accuracy=np.round(accuracy_score(self.y_test_init_binary, self.y_init),5)
-        precision=np.round(precision_score(self.y_test_init_binary, self.y_init),5)
-        recall=np.round(recall_score(self.y_test_init_binary, self.y_init),5)
+        accuracy=np.round(accuracy_score(self.y_pred_init_binary , self.y_init),5)
+        precision=np.round(precision_score(self.y_pred_init_binary , self.y_init),5)
+        recall=np.round(recall_score(self.y_pred_init_binary , self.y_init),5)
         print('accuracy:', accuracy)
         print('precision:', precision)
         print('recall:', recall)
 
         # auc 
-        fpr, tpr, _ = roc_curve(self.y_test_init_binary, self.y_init)  
+        fpr, tpr, _ = roc_curve(self.y_pred_init_binary , self.y_init)  
         # obtención de las tasas de falsos y verdaderos positivos
         auc_value=np.round(auc(fpr, tpr),5)
-        print('auc:', auc)
+        print('auc:', auc_value)
         return accuracy,precision,recall,auc_value
 
 
@@ -328,4 +338,10 @@ if __name__ == "__main__":
     print(model_instance.calculate_entropy())
     print(model_instance.calculate_mutual_information())
     print(model_instance.calculate_relative_entropy())
+    # Train neural network
+    model_instance.build_neural_network(num_layers, num_neurons_per_layer)
+    X_train, X_test, y_train, y_test,y_pred,y_pred_binary = model_instance.train_neural_network(num_epochs, batch_size)
+    model_instance.performance_measurement()
+    model_instance.performance_measurement_ground_truth()
+
 
