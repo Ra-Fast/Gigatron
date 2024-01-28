@@ -82,27 +82,33 @@ class ModelGenerator:
         else:
             print("Feature matrix (X) or target vector (y) not available. Call generate_synthetic_data first.")
 
-    def calculate_entropy(self, bins):
+    def calculate_entropy(self):
         entropy_values = []
-        for column in self.X.columns:
-            hist, bin_edges = np.histogram(self.X[column], bins=bins, range=(0, 1), density=True)
+        for column in self.X.T:
+            hist, bin_edges = np.histogram(column, bins=self.bins, range=(0, 1), density=True)
             entropy_values.append(entropy(hist, base=2))
-        return entropy_values
+        return sum(entropy_values)
         
     def calculate_mutual_information(self):
         mutual_info_values = []
-        for i in range(len(self.X.columns)):
-            for j in range(i + 1, len(self.X.columns)):
-                    mi = mutual_info_regression(self.X.iloc[:, i:i+1], self.X.iloc[:, j])
+        for i in range(self.X.shape[1]):
+            for j in range(i + 1, self.X.shape[1]):
+                    mi = mutual_info_regression(self.X[:, i:i+1], self.X[:, j])
                     mutual_info_values.append(mi)
         return mutual_info_values
     
     def calculate_relative_entropy(self):
         relative_entropy_values = []
-        for i in range(len(self.X_init.columns)):
-            kl_distance = entropy(self.X_init.iloc[:, i], qk=self.X.iloc[:, i], base=2)
+        for i in range(self.X_init.shape[1]):
+            # Calculate probs
+            prob_1,_=np.histogram(self.X_init[:,i],bins=self.bins,range=(0, 1), density=True)
+            prob_2,_=np.histogram(self.X[:,i],bins=self.bins,range=(0, 1), density=True)
+
+
+            kl_distance = entropy(prob_1, prob_2, base=2)
             relative_entropy_values.append(kl_distance)
         return relative_entropy_values
+    
 
     def plot_histogram(self, num_bins=10):
         if self.df is not None:
@@ -291,23 +297,35 @@ class ModelGenerator:
         else:
             print("Training history not available. Call train_neural_network first.")
 
-'''
-# Example usage
-num_dimensions = 5        # Change this to your desired number of dimensions
-num_classes = 2           # Change this to your desired number of classes (2 for binary classification)
-num_layers = 2            # Change this to your desired number of layers
-num_neurons_per_layer = 10  # Change this to your desired number of neurons per layer
-num_epochs = 10           # Change this to your desired number of epochs
-batch_size = 32           # Change this to your desired batch size
-drop_fraction = 0.2       # Change this to the desired fraction of rows to drop randomly
+if __name__ == "__main__":
+    # Example usage
+    num_dimensions = 5        # Change this to your desired number of dimensions
+    num_classes = 2           # Change this to your desired number of classes (2 for binary classification)
+    num_layers = 2            # Change this to your desired number of layers
+    num_neurons_per_layer = 10  # Change this to your desired number of neurons per layer
+    num_epochs = 10           # Change this to your desired number of epochs
+    batch_size = 32           # Change this to your desired batch size
+    drop_fraction = 0.2       # Change this to the desired fraction of rows to drop randomly
 
-model_instance = ModelGenerator(num_dimensions, num_classes)
-X, y = model_instance.generate_synthetic_data(plot_scatter=True)
-model_instance.drop_rows_randomly(drop_fraction)
-model_instance.plot_histogram(num_bins=20)
-model_instance.build_neural_network(num_layers, num_neurons_per_layer)
-X_train, X_test, y_train, y_test,y_pred,y_pred_binary = model_instance.train_neural_network(num_epochs, batch_size)
+    model_instance = ModelGenerator(num_dimensions, num_classes)
+    # Now X_train, X_test, y_train, and y_pred are accessible for further analysis or evaluation.
+    X, y = model_instance.generate_synthetic_data(plot_scatter=True)
+    model_instance.plot_histogram(num_bins=20)
+    # Amount of information
+    print(model_instance.calculate_entropy())
+    print(model_instance.calculate_mutual_information())
+    print(model_instance.calculate_relative_entropy())
+    
+    # Train neural network
+    model_instance.build_neural_network(num_layers, num_neurons_per_layer)
+    X_train, X_test, y_train, y_test,y_pred,y_pred_binary = model_instance.train_neural_network(num_epochs, batch_size)
+    model_instance.performance_measurement()
 
-model_instance.performance_measurement()
-'''
-# Now X_train, X_test, y_train, and y_pred are accessible for further analysis or evaluation.
+    # Drop 10%
+    model_instance.drop_rows_randomly(drop_fraction)
+    model_instance.plot_histogram(num_bins=20)
+    # Amount of information
+    print(model_instance.calculate_entropy())
+    print(model_instance.calculate_mutual_information())
+    print(model_instance.calculate_relative_entropy())
+
