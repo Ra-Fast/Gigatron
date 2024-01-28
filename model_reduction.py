@@ -224,13 +224,39 @@ class ModelGenerator:
 
     def performance_measurement(self):
         # Performance
-        print('accuracy:', np.round(accuracy_score(self.y_test_binary, self.y_pred_binary),5))
-        print('precision:', np.round(precision_score(self.y_test_binary, self.y_pred_binary),5))
-        print('recall:', np.round(recall_score(self.y_test_binary, self.y_pred_binary),5))
+        accuracy=np.round(accuracy_score(self.y_test_binary, self.y_pred_binary),5)
+        precision=np.round(precision_score(self.y_test_binary, self.y_pred_binary),5)
+        recall=np.round(recall_score(self.y_test_binary, self.y_pred_binary),5)
+        print('accuracy:', accuracy)
+        print('precision:', precision)
+        print('recall:', recall)
 
         # auc 
-        fpr, tpr, _ = roc_curve(self.y_test_binary, self.y_pred_binary)  # obtención de las tasas de falsos y verdaderos positivos
-        print('auc:', np.round(auc(fpr, tpr),5))
+        fpr, tpr, _ = roc_curve(self.y_test_binary, self.y_pred_binary)
+        # obtención de las tasas de falsos y verdaderos positivos
+        auc_value=np.round(auc(fpr, tpr),5)
+        print('auc:', auc_value)
+        return accuracy,precision,recall,auc_value
+
+    def performance_measurement_ground_truth(self):
+        # Get predicted probabilities and binary predictions
+        self.y_pred_init = self.model.predict(self.X_init)
+        self.y_pred_init_binary = (self.y_pred_init > 0.5) if self.num_classes == 2 else self.y_pred_init.argmax(axis=1)
+        # Performance
+        accuracy=np.round(accuracy_score(self.y_test_init_binary, self.y_init),5)
+        precision=np.round(precision_score(self.y_test_init_binary, self.y_init),5)
+        recall=np.round(recall_score(self.y_test_init_binary, self.y_init),5)
+        print('accuracy:', accuracy)
+        print('precision:', precision)
+        print('recall:', recall)
+
+        # auc 
+        fpr, tpr, _ = roc_curve(self.y_test_init_binary, self.y_init)  
+        # obtención de las tasas de falsos y verdaderos positivos
+        auc_value=np.round(auc(fpr, tpr),5)
+        print('auc:', auc)
+        return accuracy,precision,recall,auc_value
+
 
     def plot_training_history(self):
         if self.history is not None:
@@ -282,5 +308,6 @@ model_instance.plot_histogram(num_bins=20)
 model_instance.build_neural_network(num_layers, num_neurons_per_layer)
 X_train, X_test, y_train, y_test,y_pred,y_pred_binary = model_instance.train_neural_network(num_epochs, batch_size)
 
+model_instance.performance_measurement()
 '''
 # Now X_train, X_test, y_train, and y_pred are accessible for further analysis or evaluation.
