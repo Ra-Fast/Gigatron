@@ -7,13 +7,13 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
-from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, roc_curve, confusion_matrix,auc
+from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, roc_curve, confusion_matrix,auc, f1_score
 from sklearn.model_selection import train_test_split
 from scipy.stats import entropy
 from sklearn.feature_selection import mutual_info_regression
 
 class ModelGenerator:
-    def __init__(self, num_dimensions, num_classes, bins=10,num_samples=1000, random_state=42):
+    def __init__(self, num_dimensions, num_classes, bins=20,num_samples=1000, random_state=42):
         self.num_dimensions = num_dimensions
         self.num_classes = num_classes
         self.num_samples = num_samples
@@ -70,12 +70,15 @@ class ModelGenerator:
         return self.X, self.y
 
     def drop_rows_randomly(self,drop_fraction):
-        if self.X is not None and self.y is not None:
-            num_rows_to_drop = int(self.X.shape[0] * drop_fraction)
-            indices_to_drop = np.random.choice(self.X.shape[0], num_rows_to_drop, replace=False)
+        if self.X_init is not None and self.y is not None:
+            num_rows_to_drop = int(self.X_init.shape[0] * drop_fraction)
+            indices_to_drop = np.random.choice(self.X_init.shape[0], num_rows_to_drop, replace=False)
 
-            self.X = np.delete(self.X, indices_to_drop, axis=0)
-            self.y = np.delete(self.y, indices_to_drop, axis=0)
+            self.X = np.delete(self.X_init, indices_to_drop, axis=0)
+            self.y = np.delete(self.y_init, indices_to_drop, axis=0)
+            
+            # Update DataFrame
+            self.df.drop(indices_to_drop,inplace=True)
 
             print(f"Dropped {num_rows_to_drop} rows randomly.")
 
@@ -90,11 +93,11 @@ class ModelGenerator:
         return sum(entropy_values)
         
     def calculate_mutual_information(self):
-        mutual_info_values = []
-        for i in range(self.X.shape[1]):
-            for j in range(i + 1, self.X.shape[1]):
-                    mi = mutual_info_regression(self.X[:, i:i+1], self.X[:, j])
-                    mutual_info_values.append(mi)
+        tam=self.X.shape[1]
+        mutual_info_values = np.zeros((tam,tam))
+        for i in range(tam):
+            for j in range(i + 1, tam):
+                    mutual_info_values[i,j]= mutual_info_regression(self.X[:, i:i+1], self.X[:, j])[0]
         return mutual_info_values
     
     def calculate_relative_entropy(self):
@@ -119,7 +122,7 @@ class ModelGenerator:
         return relative_entropy_values
     
 
-    def plot_histogram(self, num_bins=10):
+    def plot_histogram(self):
         if self.df is not None:
             # Plot histograms in separate graphs for each feature
             num_features = self.num_dimensions
@@ -133,12 +136,12 @@ class ModelGenerator:
                 row, col = divmod(i, 2)
                 # Data distribution
                 if num_features==2:
-                    sns.histplot(ax=axes[row+col],data=self.df,x=column,hue='target',kde=True,bins=num_bins)
+                    sns.histplot(ax=axes[row+col],data=self.df,x=column,hue='target',kde=True,bins=self.bins)
                     axes[row+col].set_title(column)
                     axes[row+col].set_xlabel('Feature Value')
                     axes[row+col].set_ylabel('Frequency')
                 else:
-                    sns.histplot(ax=axes[row, col],data=self.df,x=column,hue='target',kde=True, bins=num_bins)
+                    sns.histplot(ax=axes[row, col],data=self.df,x=column,hue='target',kde=True, bins=self.bins)
                     axes[row, col].set_title(column)
                     axes[row, col].set_xlabel('Feature Value')
                     axes[row, col].set_ylabel('Frequency')
@@ -160,7 +163,7 @@ class ModelGenerator:
         else:
             print("DataFrame not generated or insufficient dimensions for scatter plot.")
 
-    def build_neural_network(self, num_layers=2, num_neurons_per_layer=10):
+    def build_neural_network(self, num_layers=2, num_neurons_per_layer=10,model_summary=False):
         model=None
         if self.df is not None:
             # Build a neural network using TensorFlow
@@ -179,7 +182,8 @@ class ModelGenerator:
                 # For multi-class classification, use softmax activation
                 model.add(Dense(self.num_classes, activation='softmax'))
                 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-                model.summary()
+                if model_summary:
+                    model.summary()
 
             self.model = model
         else:
@@ -252,7 +256,12 @@ class ModelGenerator:
         # obtención de las tasas de falsos y verdaderos positivos
         auc_value=np.round(auc(fpr, tpr),5)
         print('auc:', auc_value)
-        return accuracy,precision,recall,auc_value
+
+        # F1 Score
+        f1score=np.round(f1_score(self.y_test_binary, self.y_pred_binary),5)
+        print('F1_Score:', f1score)
+
+        return accuracy,precision,recall,auc_value, f1score
 
     def performance_measurement_ground_truth(self):
         # Get predicted probabilities and binary predictions
@@ -271,7 +280,13 @@ class ModelGenerator:
         # obtención de las tasas de falsos y verdaderos positivos
         auc_value=np.round(auc(fpr, tpr),5)
         print('auc:', auc_value)
-        return accuracy,precision,recall,auc_value
+
+        # F1 Score
+        f1score=np.round(f1_score(self.y_pred_init_binary , self.y_init),5)
+        print('F1_Score:', f1score)
+
+
+        return accuracy,precision,recall,auc_value,f1score
 
 
     def plot_training_history(self):
@@ -313,14 +328,22 @@ if __name__ == "__main__":
     num_classes = 2           # Change this to your desired number of classes (2 for binary classification)
     num_layers = 2            # Change this to your desired number of layers
     num_neurons_per_layer = 10  # Change this to your desired number of neurons per layer
-    num_epochs = 10           # Change this to your desired number of epochs
+    num_epochs = 5           # Change this to your desired number of epochs
     batch_size = 32           # Change this to your desired batch size
     drop_fraction = 0.2       # Change this to the desired fraction of rows to drop randomly
+    num_samples=100000
 
     model_instance = ModelGenerator(num_dimensions, num_classes)
     # Now X_train, X_test, y_train, and y_pred are accessible for further analysis or evaluation.
     X, y = model_instance.generate_synthetic_data(plot_scatter=True)
-    model_instance.plot_histogram(num_bins=20)
+    model_instance.plot_histogram()
+    
+    # Drop 10%
+    model_instance_10=ModelGenerator(num_dimensions, num_classes)
+    _,_=model_instance_10.generate_synthetic_data(plot_scatter=False)
+    model_instance_10.drop_rows_randomly(drop_fraction)
+    model_instance_10.plot_histogram()
+
     # Amount of information
     print(model_instance.calculate_entropy())
     print(model_instance.calculate_mutual_information())
@@ -331,9 +354,6 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test,y_pred,y_pred_binary = model_instance.train_neural_network(num_epochs, batch_size)
     model_instance.performance_measurement()
 
-    # Drop 10%
-    model_instance.drop_rows_randomly(drop_fraction)
-    model_instance.plot_histogram(num_bins=20)
     # Amount of information
     print(model_instance.calculate_entropy())
     print(model_instance.calculate_mutual_information())
