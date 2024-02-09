@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
+from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, roc_curve, confusion_matrix,auc, f1_score
 from sklearn.model_selection import train_test_split
 from scipy.stats import entropy
 from sklearn.feature_selection import mutual_info_regression
+import time
 
 class ModelGenerator:
     def __init__(self, num_dimensions, num_classes, bins=20,num_samples=1000, random_state=42):
@@ -30,6 +32,7 @@ class ModelGenerator:
         self.y = None  # Internal variable to store target vector
         self.X_init = None  # Internal variable to store feature matrix - Initial values
         self.y_init = None  # Internal variable to store target vector - Initial values
+        self.execution_time=0
 
         tf.random.set_seed(random_state)
         np.random.seed(random_state)
@@ -177,13 +180,14 @@ class ModelGenerator:
                 # For binary classification, use sigmoid activation
                 model.add(Dense(1, activation='sigmoid'))
                 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-                model.summary()
+
             else:
                 # For multi-class classification, use softmax activation
                 model.add(Dense(self.num_classes, activation='softmax'))
                 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-                if model_summary:
-                    model.summary()
+               
+            if model_summary:
+                model.summary()
 
             self.model = model
         else:
@@ -193,11 +197,18 @@ class ModelGenerator:
         if self.df is not None and self.model is not None:
             X_train, X_test, y_train, y_test = train_test_split(
                 self.df.drop('target', axis=1), self.df['target'], test_size=0.2, random_state=self.random_state)
+            
+            # Define early stopping criteria
+            early_stopping = EarlyStopping(monitor='val_loss', patience=5)
 
+            self.execution_time=0
+            start_time = time.time()
             history = self.model.fit(X_train, y_train, epochs=num_epochs, batch_size=batch_size, verbose=0,
-                                     validation_data=(X_test, y_test))
+                                     validation_data=(X_test, y_test),callbacks=[early_stopping])
 
             self.history = history.history
+            end_time=time.time()
+            self.execution_time=end_time-start_time
 
             # Get predicted probabilities and binary predictions
             self.y_pred = self.model.predict(X_test)
