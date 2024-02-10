@@ -5,9 +5,11 @@ from sklearn.preprocessing import MinMaxScaler
 import seaborn as sns
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import tensorflow.keras
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping,LearningRateScheduler
+from keras import backend as K
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, roc_curve, confusion_matrix,auc, f1_score
 from sklearn.model_selection import train_test_split
 from scipy.stats import entropy
@@ -172,19 +174,23 @@ class ModelGenerator:
             # Build a neural network using TensorFlow
             model = Sequential()
             model.add(Dense(num_neurons_per_layer, input_dim=self.num_dimensions, activation='relu'))
+            opt=tensorflow.keras.optimizers.Adam(learning_rate=0.001)
 
             for _ in range(num_layers - 1):
                 model.add(Dense(num_neurons_per_layer, activation='relu'))
 
+
             if self.num_classes == 2:
                 # For binary classification, use sigmoid activation
                 model.add(Dense(1, activation='sigmoid'))
-                model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+                #model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+                model.compile(optimizer=opt, loss='binary_crossentropy', metrics=['accuracy'])
 
             else:
                 # For multi-class classification, use softmax activation
                 model.add(Dense(self.num_classes, activation='softmax'))
-                model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+                #model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+                model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
                
             if model_summary:
                 model.summary()
@@ -192,6 +198,14 @@ class ModelGenerator:
             self.model = model
         else:
             print("DataFrame not generated. Call generate_synthetic_data first.")
+
+    def lr_schedule(self,epoch, lr):
+        # Define custom learning rate schedule here
+        if epoch < 10:
+            return lr
+        else:
+            return lr * 0.9
+
 
     def train_neural_network(self, num_epochs=10, batch_size=32):
         if self.df is not None and self.model is not None:
@@ -201,10 +215,14 @@ class ModelGenerator:
             # Define early stopping criteria
             early_stopping = EarlyStopping(monitor='val_loss', patience=5)
 
+            # Dynamic learning rate
+            learning_rate_scheduler = LearningRateScheduler(self.lr_schedule, verbose=1)
+
+
             self.execution_time=0
             start_time = time.time()
             history = self.model.fit(X_train, y_train, epochs=num_epochs, batch_size=batch_size, verbose=0,
-                                     validation_data=(X_test, y_test),callbacks=[early_stopping])
+                                     validation_data=(X_test, y_test),callbacks=[early_stopping,learning_rate_scheduler])
 
             self.history = history.history
             end_time=time.time()
