@@ -216,7 +216,7 @@ class ModelGenerator:
             early_stopping = EarlyStopping(monitor='val_loss', patience=5)
 
             # Dynamic learning rate
-            learning_rate_scheduler = LearningRateScheduler(self.lr_schedule, verbose=1)
+            learning_rate_scheduler = LearningRateScheduler(self.lr_schedule)
 
 
             self.execution_time=0
